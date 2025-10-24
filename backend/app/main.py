@@ -15,6 +15,7 @@ from .routes import collections as collections_routes
 from .routes import vectors as vectors_routes
 from .routes import snapshots as snapshots_routes
 from .routes import stats as stats_routes
+from .routes import security as security_routes
 
 from .core.config import Settings
 from .core.middleware import (
@@ -70,4 +71,5 @@ api.include_router(collections_routes.router)
 api.include_router(vectors_routes.router)
 api.include_router(snapshots_routes.router)
 api.include_router(stats_routes.router)
+api.include_router(security_routes.router)
 app.include_router(api, prefix="/api")

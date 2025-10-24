@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     qdrant_host: str = Field(default="localhost")
     qdrant_port: int = Field(default=6333, ge=1, le=65535)
     qdrant_api_key: SecretStr | None = Field(default=None)
+    qdrant_api_key_file: Path | None = Field(default=None, description="Optional file path to read Qdrant API key from")
     qdrant_timeout: float = Field(default=10.0, ge=0.1)
 
     # Auth (JWT)
@@ -45,6 +46,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 
     def get_qdrant_api_key(self) -> str | None:
+        # Prefer file if configured
+        try:
+            if self.qdrant_api_key_file:
+                p = self.qdrant_api_key_file
+                if p.exists():
+                    return p.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
         return self.qdrant_api_key.get_secret_value() if self.qdrant_api_key else None
 
     def get_jwt_secret(self) -> str:
@@ -56,4 +65,3 @@ class Settings(BaseSettings):
     @property
     def use_https(self) -> bool:
         return self.qdrant_port == 443
-

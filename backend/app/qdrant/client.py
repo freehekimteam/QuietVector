@@ -33,3 +33,8 @@ def get_qdrant_client() -> QdrantClient:
         logger.info("Qdrant connection OK")
     return _qdrant
 
+
+def reset_qdrant_client() -> None:
+    global _qdrant
+    _qdrant = None
+
