@@ -11,6 +11,28 @@ export default function InsertVectors() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
 
+  function validate(points: Point[]): string[] {
+    const errors: string[] = []
+    if (!Array.isArray(points) || points.length === 0) {
+      errors.push('Boş liste')
+      return errors
+    }
+    // Vector boyutu tutarlılığı
+    const dim = Array.isArray(points[0].vector) ? points[0].vector.length : 0
+    points.forEach((p, idx) => {
+      if (typeof p.id !== 'string' && typeof p.id !== 'number') errors.push(`#${idx}: id tipi geçersiz`)
+      if (!Array.isArray(p.vector) || p.vector.length === 0) errors.push(`#${idx}: vector geçersiz`)
+      if (Array.isArray(p.vector) && p.vector.some(v => typeof v !== 'number' || Number.isNaN(v))) errors.push(`#${idx}: vector sayısal olmalı`)
+      if (Array.isArray(p.vector) && p.vector.length !== dim) errors.push(`#${idx}: vector boyutu tutarsız (beklenen ${dim})`)
+      if (p.payload && typeof p.payload !== 'object') errors.push(`#${idx}: payload obje olmalı`)
+    })
+    return errors
+  }
+
+  function example() {
+    setJsonText('[\n  {"id": 1, "vector": [0.1, 0.2, 0.3], "payload": {"title": "Örnek"}},\n  {"id": "doc-2", "vector": [0.4, 0.5, 0.6], "payload": {"tags": ["a","b"]}}\n]')
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setMsg(''); setErr(''); setLoading(true)
@@ -22,7 +44,8 @@ export default function InsertVectors() {
       } else {
         points = JSON.parse(jsonText)
       }
-      if (!Array.isArray(points) || points.length === 0) throw new Error('Geçersiz points verisi')
+      const errors = validate(points)
+      if (errors.length) throw new Error('Doğrulama hatası:\n' + errors.join('\n'))
       const res = await insertVectors({ collection, points })
       setMsg(`Yüklendi: ${res.inserted}`)
     } catch (e:any) {
@@ -42,9 +65,11 @@ export default function InsertVectors() {
         <div className="text-sm text-gray-600">JSON ile ya da dosya seçerek yükleyebilirsiniz. Dosya seçerseniz metin gözardı edilir.</div>
         <textarea className="border rounded px-3 py-2 font-mono h-48" value={jsonText} onChange={e=>setJsonText(e.target.value)} />
         <input type="file" accept="application/json,.json" onChange={e=>setFile(e.target.files?.[0])} />
-        <button disabled={loading} className="bg-black text-white rounded px-3 py-2 w-40 disabled:opacity-50">{loading? 'Yükleniyor...' : 'Yükle'}</button>
+        <div className="flex gap-2 items-center">
+          <button type="button" onClick={example} className="border rounded px-3 py-2">Örnek Doldur</button>
+          <button disabled={loading} className="bg-black text-white rounded px-3 py-2 w-40 disabled:opacity-50">{loading? 'Yükleniyor...' : 'Yükle'}</button>
+        </div>
       </form>
     </div>
   )
 }
-

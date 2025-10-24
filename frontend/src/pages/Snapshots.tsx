@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createSnapshot, listSnapshots, restoreSnapshot } from '../lib/api'
+import { createSnapshot, listSnapshots, restoreSnapshot, restoreSnapshotAsync, getRestoreStatus } from '../lib/api'
 
 type SnapItem = { name: string; creation_time?: string; size?: number }
 
@@ -10,6 +10,9 @@ export default function Snapshots() {
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [asyncMode, setAsyncMode] = useState(true)
+  const [opId, setOpId] = useState('')
+  const [stage, setStage] = useState('')
 
   async function load() {
     setMsg(''); setErr('')
@@ -39,8 +42,29 @@ export default function Snapshots() {
     if (!file) { setErr('Dosya seçin'); return }
     setMsg(''); setErr(''); setLoading(true)
     try {
-      await restoreSnapshot(collection, file)
-      setMsg('Geri yükleme başlatıldı')
+      if (asyncMode) {
+        const res = await restoreSnapshotAsync(collection, file)
+        setOpId(res.op_id)
+        setStage(res.stage)
+        setMsg('Yükleme başlatıldı')
+        // Poll status
+        const timer = setInterval(async () => {
+          try {
+            const s = await getRestoreStatus(res.op_id)
+            setStage(s.stage)
+            if (s.stage === 'completed' || s.stage === 'failed') {
+              clearInterval(timer)
+              if (s.stage === 'failed') setErr(s.error || 'Geri yükleme başarısız')
+            }
+          } catch (e:any) {
+            clearInterval(timer)
+            setErr(e?.message || 'Durum sorgu hatası')
+          }
+        }, 1000)
+      } else {
+        await restoreSnapshot(collection, file)
+        setMsg('Geri yükleme tamamlandı')
+      }
     } catch (e:any) {
       setErr(e?.message || 'Geri yükleme hatası')
     } finally {
@@ -83,12 +107,17 @@ export default function Snapshots() {
       <form onSubmit={restore} className="mt-6 border rounded p-3 max-w-xl">
         <h3 className="font-medium mb-2">Restore</h3>
         <div className="text-sm text-gray-600 mb-2">Qdrant'a snapshot yükleyerek koleksiyonu geri yükleyin.</div>
+        <label className="flex items-center gap-2 text-sm mb-2">
+          <input type="checkbox" checked={asyncMode} onChange={e=>setAsyncMode(e.target.checked)} /> Asenkron yükle (önerilen)
+        </label>
         <input type="file" onChange={e=>setFile(e.target.files?.[0])} />
         <div className="mt-2">
           <button disabled={!collection || !file || loading} className="bg-black text-white rounded px-3 py-2 disabled:opacity-50">Yükle</button>
         </div>
+        {opId && (
+          <div className="mt-2 text-sm text-gray-700">İşlem: {opId} — Durum: <b>{stage}</b></div>
+        )}
       </form>
     </div>
   )
 }
-

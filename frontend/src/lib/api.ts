@@ -77,3 +77,21 @@ export async function restoreSnapshot(collection: string, file: File) {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+export async function restoreSnapshotAsync(collection: string, file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  const r = await fetch(`${API_BASE}/snapshots/${encodeURIComponent(collection)}/restore_async`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: form,
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<{ op_id: string; stage: string }>;
+}
+
+export async function getRestoreStatus(op_id: string) {
+  const r = await fetch(`${API_BASE}/snapshots/restore_status/${encodeURIComponent(op_id)}`, { headers: authHeaders() });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
