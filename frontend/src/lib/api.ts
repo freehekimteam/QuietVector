@@ -40,3 +40,40 @@ export async function searchVector(data: { collection: string; vector: number[];
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+export async function insertVectors(data: { collection: string; points: Array<{ id: string|number; vector: number[]; payload?: any }> }) {
+  const r = await fetch(`${API_BASE}/vectors/insert`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listSnapshots(collection: string) {
+  const r = await fetch(`${API_BASE}/snapshots/${encodeURIComponent(collection)}`, { headers: authHeaders() });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function createSnapshot(collection: string) {
+  const r = await fetch(`${API_BASE}/snapshots/${encodeURIComponent(collection)}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function restoreSnapshot(collection: string, file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  const r = await fetch(`${API_BASE}/snapshots/${encodeURIComponent(collection)}/restore`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: form,
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
