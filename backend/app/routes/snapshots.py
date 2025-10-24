@@ -3,10 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import StreamingResponse
 
 from ..core.config import Settings
+from ..core.ops import tracker
+import os
+import tempfile
+from pathlib import Path
 from .deps import require_auth
 
 router = APIRouter(prefix="/snapshots", tags=["Snapshots"])
@@ -98,3 +102,64 @@ async def restore_snapshot(collection: str, file: UploadFile = File(...), _: str
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+def _do_upload(op_id: str, collection: str, tmp_path: Path) -> None:
+    tracker.update(op_id, stage="uploading")
+    url = f"{_base_url()}/collections/{collection}/snapshots/upload"
+    try:
+        with httpx.Client(timeout=None) as client:
+            with tmp_path.open("rb") as f:
+                files = {"snapshot": (tmp_path.name, f, "application/octet-stream")}
+                r = client.post(url, headers=_headers(), files=files)
+        if r.status_code not in (200, 202):
+            tracker.update(op_id, stage="failed", error=f"{r.status_code}: {r.text[:400]}")
+        else:
+            tracker.update(op_id, stage="completed")
+    except Exception as e:
+        tracker.update(op_id, stage="failed", error=str(e))
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+@router.post("/{collection}/restore_async")
+async def restore_snapshot_async(
+    collection: str,
+    background: BackgroundTasks,
+    file: UploadFile = File(...),
+    _: str = Depends(require_auth),
+) -> dict:
+    """Async restore: save upload to temp, return op_id and perform upload in background."""
+    op = tracker.create("snapshot_restore", meta={"collection": collection, "filename": file.filename or "snapshot.tar"})
+    tracker.update(op.id, stage="saving")
+    try:
+        tmp_dir = Path(tempfile.gettempdir()) / "quietvector"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        tmp_path = tmp_dir / f"{op.id}.snapshot"
+        total = 0
+        with tmp_path.open("wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                out.write(chunk)
+        tracker.update(op.id, meta={"bytes_total": total})
+    except Exception as e:
+        tracker.update(op.id, stage="failed", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Kick background upload
+    background.add_task(_do_upload, op.id, collection, tmp_path)
+    return {"op_id": op.id, "stage": tracker.get(op.id).stage}
+
+
+@router.get("/restore_status/{op_id}")
+def restore_status(op_id: str, _: str = Depends(require_auth)) -> dict:
+    try:
+        return tracker.to_dict(op_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Operation not found")
