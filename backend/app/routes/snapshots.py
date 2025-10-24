@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 
 from ..core.config import Settings
@@ -81,3 +81,20 @@ def download_snapshot(collection: str, name: str, _: str = Depends(require_auth)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.post("/{collection}/restore")
+async def restore_snapshot(collection: str, file: UploadFile = File(...), _: str = Depends(require_auth)) -> dict:
+    """Restore a collection from a snapshot file (streamed upload)."""
+    url = f"{_base_url()}/collections/{collection}/snapshots/upload"
+    try:
+        # Stream file to Qdrant using multipart form-data
+        async with httpx.AsyncClient(timeout=None) as client:
+            files = {"snapshot": (file.filename or "snapshot.tar", file.file, "application/octet-stream")}
+            r = await client.post(url, headers=_headers(), files=files)
+        if r.status_code not in (200, 202):
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        return r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
