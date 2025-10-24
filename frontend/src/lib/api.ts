@@ -95,3 +95,13 @@ export async function getRestoreStatus(op_id: string) {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+export async function opsApply(dryRun: boolean, adminPassword: string) {
+  const r = await fetch(`${API_BASE}/security/ops_apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ dry_run: dryRun, admin_password: adminPassword })
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ executed: boolean; mode: string; command: string[]; rc?: number; stdout?: string; stderr?: string }>
+}

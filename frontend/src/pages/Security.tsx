@@ -10,6 +10,8 @@ async function prepare(newKey: string, adminPassword: string) {
   return r.json() as Promise<{ op_id: string; apply_instructions: string[] }>
 }
 
+import { opsApply } from '../lib/api'
+
 export default function Security() {
   const [key1, setKey1] = useState('')
   const [key2, setKey2] = useState('')
@@ -19,6 +21,10 @@ export default function Security() {
   const [opId, setOpId] = useState('')
   const [instr, setInstr] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const [opsOut, setOpsOut] = useState('')
+  const [opsErr, setOpsErr] = useState('')
+  const [opsCmd, setOpsCmd] = useState<string[]>([])
+  const [opsMode, setOpsMode] = useState('')
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -60,7 +66,53 @@ export default function Security() {
           <pre className="text-xs whitespace-pre-wrap mt-2">{instr.join('\n')}</pre>
         </div>
       )}
+
+      <div className="mt-6 border rounded p-3 max-w-2xl">
+        <h3 className="font-medium mb-2">Ops Apply (Qdrant yeniden başlat)</h3>
+        <div className="text-sm text-gray-600 mb-2">Bu işlem devredeyse backend kontrollü şekilde docker compose/systemctl çağırır. Önce "Dry Run" ile komutu görün, sonra uygula.</div>
+        <div className="flex gap-2">
+          <button className="border rounded px-3 py-2" onClick={async ()=>{
+            try {
+              setErr(''); setOpsErr(''); setOpsOut('');
+              const res = await opsApply(true, pwd)
+              setOpsCmd(res.command); setOpsMode(res.mode)
+              setMsg('Dry run başarılı. Komut aşağıda.');
+            } catch (e:any) {
+              setErr(e?.message || 'Dry run hatası')
+            }
+          }}>Dry Run</button>
+          <button className="bg-black text-white rounded px-3 py-2" onClick={async ()=>{
+            try {
+              setErr(''); setOpsErr(''); setOpsOut(''); setMsg('');
+              const res = await opsApply(false, pwd)
+              setOpsCmd(res.command); setOpsMode(res.mode)
+              setOpsOut((res.stdout||'').slice(0,400)); setOpsErr((res.stderr||'').slice(0,400));
+              setMsg(`Uygulandı (rc=${res.rc})`)
+            } catch (e:any) {
+              setErr(e?.message || 'Uygulama hatası')
+            }
+          }}>Uygula</button>
+        </div>
+        {opsCmd.length>0 && (
+          <div className="mt-2 text-xs">
+            <div>Mod: <b>{opsMode}</b></div>
+            <div>Komut:</div>
+            <pre className="whitespace-pre-wrap">{opsCmd.join(' ')}</pre>
+          </div>
+        )}
+        {(opsOut || opsErr) && (
+          <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div className="font-medium">stdout</div>
+              <pre className="whitespace-pre-wrap">{opsOut}</pre>
+            </div>
+            <div>
+              <div className="font-medium">stderr</div>
+              <pre className="whitespace-pre-wrap">{opsErr}</pre>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
-
