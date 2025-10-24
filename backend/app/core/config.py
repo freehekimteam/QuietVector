@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     audit_log_path: Path = Field(default=Path("/var/log/quietvector/audit.log"))
     log_json: bool = Field(default=True)
 
+    # Ops Apply (disabled by default)
+    enable_ops_apply: bool = Field(default=False, description="Allow backend to execute controlled ops apply actions")
+    ops_apply_mode: Literal["docker_compose", "systemctl", "none"] | None = Field(default=None)
+    ops_apply_compose_file: Path | None = Field(default=None)
+    ops_apply_service: str = Field(default="qdrant")
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 
     def get_qdrant_api_key(self) -> str | None:
