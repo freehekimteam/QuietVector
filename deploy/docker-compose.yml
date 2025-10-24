@@ -1,0 +1,42 @@
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: quietvector-api:dev
+    container_name: quietvector-api
+    env_file:
+      - ../.env
+    networks:
+      - quietnet
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: quietvector-web:dev
+    container_name: quietvector-web
+    networks:
+      - quietnet
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: quietvector-caddy
+    ports:
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+    networks:
+      - quietnet
+    depends_on:
+      - api
+      - web
+    restart: unless-stopped
+
+networks:
+  quietnet:
+    driver: bridge
