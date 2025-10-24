@@ -1,14 +1,14 @@
-# QuietVector Deployment Guide
+# 📦 QuietVector Deployment Guide
 
-## Topology
+## 🏗️ Topology
 - api (FastAPI) + web (React build) + caddy (TLS reverse proxy)
 - Dinleme portu: 8443 (localhost bağlanır). Erişim tünel/VPN üzerinden.
 
-## Prerequisites
+## 📋 Prerequisites
 - Docker, Docker Compose
 - Qdrant (host/port/key) — yalnız iç ağ erişimi
 
-## Environment
+## ⚙️ Environment
 `.env` dosyası gereklidir. Önemli anahtarlar:
 - `QDRANT_HOST`, `QDRANT_PORT`, `QDRANT_API_KEY` veya `QDRANT_API_KEY_FILE`
 - `ADMIN_PASSWORD_HASH` (argon2)
@@ -22,7 +22,7 @@ Ops-Apply (opsiyonel):
 
 Not: Ops-apply yalnızca docker/systemctl komutlarının çalıştığı host’ta, dikkatle kullanılmalıdır.
 
-## Start/Stop
+## ▶️⏹️ Start/Stop
 ```
 cd deploy
 docker compose up -d --build
@@ -30,14 +30,14 @@ docker compose up -d --build
 docker compose down
 ```
 
-## Health/Metrics
+## 📈 Health/Metrics
 - `https://localhost:8443/api/health` → `{status: ok}`
 - `https://localhost:8443/api/metrics` → Prometheus formatı
 
-## Logs
+## 🧾 Logs
 - API: `docker logs -f quietvector-api`
 - Caddy: `deploy/caddy/*`
 
-## Security Notes
+## 🔐 Security Notes
 - Caddy TLS internal sertifika kullanır (self-signed). Üretimde tünel/VPN arkasında çalıştırın.
 - Rate limit ve body limit varsayılanları `.env` ile ayarlanabilir.
