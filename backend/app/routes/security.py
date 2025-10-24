@@ -11,13 +11,14 @@ from ..core.ops import tracker
 from ..core.security import verify_password_hash
 from ..qdrant.client import reset_qdrant_client
 from ..schemas.security import PrepareKeyRequest, PrepareKeyResponse
+from .deps import require_auth
 
 router = APIRouter(prefix="/security", tags=["Security"])
 settings = Settings()
 
 
 @router.post("/qdrant_key/prepare", response_model=PrepareKeyResponse)
-def prepare_qdrant_key(body: PrepareKeyRequest) -> PrepareKeyResponse:
+def prepare_qdrant_key(body: PrepareKeyRequest, _: str = Depends(require_auth)) -> PrepareKeyResponse:
     # Re-auth with password
     if not settings.admin_password_hash:
         raise HTTPException(status_code=500, detail="Admin password not configured")
@@ -53,4 +54,3 @@ def prepare_qdrant_key(body: PrepareKeyRequest) -> PrepareKeyResponse:
         "# 3) Verify: curl -H 'api-key: <NEW_KEY>' http://localhost:6333/healthz",
     ]
     return PrepareKeyResponse(op_id=op.id, apply_instructions=apply_instructions)
-
