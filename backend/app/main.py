@@ -5,7 +5,7 @@ Sade, güvenli Qdrant yönetim arayüzünün FastAPI backend'i.
 from __future__ import annotations
 
 import logging
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -63,9 +63,11 @@ def health():
 
 
 
-# Routers
-app.include_router(auth_routes.router)
-app.include_router(collections_routes.router)
-app.include_router(vectors_routes.router)
-app.include_router(snapshots_routes.router)
-app.include_router(stats_routes.router)
+# Routers (prefix all under /api)
+api = APIRouter()
+api.include_router(auth_routes.router)
+api.include_router(collections_routes.router)
+api.include_router(vectors_routes.router)
+api.include_router(snapshots_routes.router)
+api.include_router(stats_routes.router)
+app.include_router(api, prefix="/api")
