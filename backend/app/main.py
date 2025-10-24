@@ -10,6 +10,12 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from .routes import auth as auth_routes
+from .routes import collections as collections_routes
+from .routes import vectors as vectors_routes
+from .routes import snapshots as snapshots_routes
+from .routes import stats as stats_routes
+
 from .core.config import Settings
 from .core.middleware import (
     AuditLogMiddleware,
@@ -55,3 +61,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 def health():
     return {"status": "ok"}
 
+
+
+# Routers
+app.include_router(auth_routes.router)
+app.include_router(collections_routes.router)
+app.include_router(vectors_routes.router)
+app.include_router(snapshots_routes.router)
+app.include_router(stats_routes.router)
