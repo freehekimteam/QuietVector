@@ -5,6 +5,9 @@ Sade, güvenli Qdrant yönetim arayüzünün FastAPI backend'i.
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI, Request, status, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,16 +21,50 @@ from .routes import stats as stats_routes
 from .routes import security as security_routes
 
 from .core.config import Settings
+from .core.logging import setup_logging, get_logger
 from .core.middleware import (
     AuditLogMiddleware,
     BodySizeLimitMiddleware,
+    CSRFMiddleware,
     RateLimitMiddleware,
     RequestIDMiddleware,
 )
+from .qdrant.client import close_qdrant_client
 
 settings = Settings()
 
-app = FastAPI(title="QuietVector API", version="0.1.0")
+# Setup structured logging
+setup_logging(settings)
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    Application lifespan events
+    Handles startup and shutdown tasks
+    """
+    # Startup
+    logger.info(
+        "QuietVector starting",
+        extra={
+            "version": app.version,
+            "api_host": settings.api_host,
+            "api_port": settings.api_port
+        }
+    )
+    yield
+    # Shutdown
+    logger.info("QuietVector shutting down")
+    await close_qdrant_client()
+    logger.info("Qdrant client closed gracefully")
+
+
+app = FastAPI(
+    title="QuietVector API",
+    version="0.1.0",
+    lifespan=lifespan
+)
 
 # Metrics
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
@@ -43,15 +80,26 @@ if settings.frontend_origin:
     )
 
 # Protections & audit
+# Order matters: RequestID → BodySize → RateLimit → CSRF → Audit
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_body_size_bytes)
 app.add_middleware(RateLimitMiddleware, per_minute=settings.rate_limit_per_minute)
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(AuditLogMiddleware, path=settings.audit_log_path)
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logging.getLogger(__name__).error(f"Unhandled: {exc}", exc_info=True)
+    logger.error(
+        "Unhandled exception",
+        exc_info=True,
+        extra={
+            "method": request.method,
+            "path": str(request.url.path),
+            "client": request.client.host if request.client else None,
+            "error_type": type(exc).__name__
+        }
+    )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"error": "Internal server error"},

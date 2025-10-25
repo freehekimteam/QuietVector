@@ -1,77 +1,64 @@
 from __future__ import annotations
 
-from typing import List
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from qdrant_client.models import Distance as QDistance, VectorParams
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..qdrant.client import get_qdrant_client
 from ..schemas.collections import CollectionInfo, CreateCollectionRequest
+from ..services.collection_service import CollectionService
 from .deps import require_auth
 
 router = APIRouter(prefix="/collections", tags=["Collections"])
 
 
-def _map_distance(name: str) -> QDistance:
-    n = name.lower()
-    if n.startswith("cos"):
-        return QDistance.COSINE
-    if n.startswith("dot"):
-        return QDistance.DOT
-    return QDistance.EUCLID
+async def get_collection_service(_: str = Depends(require_auth)) -> CollectionService:
+    """Dependency injection for CollectionService"""
+    client = await get_qdrant_client()
+    return CollectionService(client)
 
 
-@router.get("", response_model=List[CollectionInfo])
-def list_collections(_: str = Depends(require_auth)) -> list[CollectionInfo]:
-    c = get_qdrant_client()
-    cols = c.get_collections().collections
-    out: list[CollectionInfo] = []
-    for col in cols:
-        info = c.get_collection(col.name)
-        out.append(
-            CollectionInfo(
-                name=col.name,
-                points_count=getattr(info, "points_count", 0) or 0,
-                vectors_count=getattr(info, "vectors_count", 0) or 0,
-                status=getattr(getattr(info, "status", None), "value", str(getattr(info, "status", "unknown"))),
-            )
-        )
-    return out
+@router.get("")
+async def list_collections(
+    service: CollectionService = Depends(get_collection_service)
+) -> dict[str, list[dict[str, Any]]]:
+    """List all collections"""
+    collections = await service.list_collections()
+    return {"collections": collections}
 
 
 @router.get("/{name}", response_model=CollectionInfo)
-def get_collection(name: str, _: str = Depends(require_auth)) -> CollectionInfo:
-    c = get_qdrant_client()
+async def get_collection(
+    name: str,
+    service: CollectionService = Depends(get_collection_service)
+) -> CollectionInfo:
+    """Get detailed collection information"""
     try:
-        info = c.get_collection(name)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Collection not found")
-    return CollectionInfo(
-        name=name,
-        points_count=getattr(info, "points_count", 0) or 0,
-        vectors_count=getattr(info, "vectors_count", 0) or 0,
-        status=getattr(getattr(info, "status", None), "value", str(getattr(info, "status", "unknown"))),
-    )
+        return await service.get_collection_info(name)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {str(e)}")
 
 
 @router.post("", status_code=201)
-def create_collection(body: CreateCollectionRequest, _: str = Depends(require_auth)) -> dict:
-    c = get_qdrant_client()
-    vectors = VectorParams(size=body.vectors_size, distance=_map_distance(body.distance))
+async def create_collection(
+    body: CreateCollectionRequest,
+    service: CollectionService = Depends(get_collection_service)
+) -> dict[str, Any]:
+    """Create a new collection"""
     try:
-        c.create_collection(collection_name=body.name, vectors_config=vectors, hnsw_config=None)
+        return await service.create_collection(body)
     except Exception as e:
-        # If exists -> try no-op error mapping
-        raise HTTPException(status_code=400, detail=str(e))
-    return {"created": body.name}
+        raise HTTPException(status_code=400, detail=f"Failed to create collection: {str(e)}")
 
 
 @router.delete("/{name}")
-def delete_collection(name: str, _: str = Depends(require_auth)) -> dict:
-    c = get_qdrant_client()
+async def delete_collection(
+    name: str,
+    service: CollectionService = Depends(get_collection_service)
+) -> dict[str, bool]:
+    """Delete a collection"""
     try:
-        c.delete_collection(name)
-        return {"deleted": name}
-    except Exception:
-        raise HTTPException(status_code=404, detail="Collection not found")
+        return await service.delete_collection(name)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {str(e)}")
 

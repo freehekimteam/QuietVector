@@ -4,15 +4,30 @@ export async function login(username: string, password: string) {
   const r = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password }),
+    credentials: 'include'  // Include cookies for CSRF token
   });
   if (!r.ok) throw new Error(await r.text());
-  return r.json() as Promise<{ access_token: string; token_type: string }>
+  const data = await r.json() as { access_token: string; token_type: string; csrf_token: string };
+
+  // Store CSRF token in localStorage
+  localStorage.setItem('qv_csrf', data.csrf_token);
+
+  return data;
 }
 
 export function authHeaders() {
   const t = localStorage.getItem('qv_token') || '';
   return { 'Authorization': `Bearer ${t}` } as HeadersInit;
+}
+
+export function mutationHeaders() {
+  const t = localStorage.getItem('qv_token') || '';
+  const csrf = localStorage.getItem('qv_csrf') || '';
+  return {
+    'Authorization': `Bearer ${t}`,
+    'X-CSRF-Token': csrf
+  } as HeadersInit;
 }
 
 export async function listCollections() {
@@ -24,8 +39,9 @@ export async function listCollections() {
 export async function createCollection(data: { name: string; vectors_size: number; distance: 'Cosine'|'Dot'|'Euclid' }) {
   const r = await fetch(`${API_BASE}/collections`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(data)
+    headers: { 'Content-Type': 'application/json', ...mutationHeaders() },
+    body: JSON.stringify(data),
+    credentials: 'include'
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -34,8 +50,9 @@ export async function createCollection(data: { name: string; vectors_size: numbe
 export async function searchVector(data: { collection: string; vector: number[]; limit?: number; with_payload?: boolean }) {
   const r = await fetch(`${API_BASE}/vectors/search`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(data)
+    headers: { 'Content-Type': 'application/json', ...mutationHeaders() },
+    body: JSON.stringify(data),
+    credentials: 'include'
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -44,8 +61,9 @@ export async function searchVector(data: { collection: string; vector: number[];
 export async function insertVectors(data: { collection: string; points: Array<{ id: string|number; vector: number[]; payload?: any }> }) {
   const r = await fetch(`${API_BASE}/vectors/insert`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(data)
+    headers: { 'Content-Type': 'application/json', ...mutationHeaders() },
+    body: JSON.stringify(data),
+    credentials: 'include'
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -60,7 +78,8 @@ export async function listSnapshots(collection: string) {
 export async function createSnapshot(collection: string) {
   const r = await fetch(`${API_BASE}/snapshots/${encodeURIComponent(collection)}`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: mutationHeaders(),
+    credentials: 'include'
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -71,8 +90,9 @@ export async function restoreSnapshot(collection: string, file: File) {
   form.append('file', file);
   const r = await fetch(`${API_BASE}/snapshots/${encodeURIComponent(collection)}/restore`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: mutationHeaders(),
     body: form,
+    credentials: 'include'
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -83,8 +103,9 @@ export async function restoreSnapshotAsync(collection: string, file: File) {
   form.append('file', file);
   const r = await fetch(`${API_BASE}/snapshots/${encodeURIComponent(collection)}/restore_async`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: mutationHeaders(),
     body: form,
+    credentials: 'include'
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json() as Promise<{ op_id: string; stage: string }>;
@@ -99,8 +120,9 @@ export async function getRestoreStatus(op_id: string) {
 export async function opsApply(dryRun: boolean, adminPassword: string) {
   const r = await fetch(`${API_BASE}/security/ops_apply`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ dry_run: dryRun, admin_password: adminPassword })
+    headers: { 'Content-Type': 'application/json', ...mutationHeaders() },
+    body: JSON.stringify({ dry_run: dryRun, admin_password: adminPassword }),
+    credentials: 'include'
   })
   if (!r.ok) throw new Error(await r.text())
   return r.json() as Promise<{ executed: boolean; mode: string; command: string[]; rc?: number; stdout?: string; stderr?: string }>

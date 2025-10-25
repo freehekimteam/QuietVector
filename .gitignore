@@ -1,24 +1,89 @@
 # General
 .DS_Store
 *.log
-*.sqlite* 
+*.sqlite*
 .env
 __pycache__/
 .venv/
 venv/
+*.swp
+*.swo
+*~
+.idea/
 
 # Python
 *.pyc
+*.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+*.egg-info/
+dist/
+build/
+*.egg
 
 # Node/Frontend
 node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/test-results/
+frontend/playwright-report/
+frontend/.playwright/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
 # Docker
 deploy/caddy/data/
 deploy/caddy/config/
 deploy/caddy/logs/
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# Secrets
+*.pem
+*.key
+*.crt
+*.cert
+!deploy/caddy/*.crt  # Allow self-signed certs in caddy
+
+# Local development
+.local/
+local.env
+.env.local
+.env.development
+.env.test
+
+# Logs
+logs/
+*.log
+audit.log
+/var/log/
+
+# Backups
+*.backup
+*.old

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import './index.css'
 import Login from './pages/Login'
 import Collections from './pages/Collections'
@@ -10,33 +11,77 @@ import Nav from './components/Nav'
 
 function isAuthed(){ return !!localStorage.getItem('qv_token') }
 
-export default function App() {
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState(isAuthed())
-  const [tab, setTab] = useState<'collections'|'search'|'insert'|'snapshots'|'security'>('collections')
+  const location = useLocation()
 
   useEffect(()=>{
     if(!isAuthed()) setAuthed(false)
   },[])
 
+  const handleLogout = () => {
+    localStorage.removeItem('qv_token')
+    localStorage.removeItem('qv_csrf')
+    setAuthed(false)
+  }
+
   if(!authed) return <Login onOk={()=>setAuthed(true)} />
+
+  const isActive = (path: string) => location.pathname === path
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Nav onLogout={()=>{ localStorage.removeItem('qv_token'); setAuthed(false) }} />
+      <Nav onLogout={handleLogout} />
       <div className="max-w-6xl mx-auto">
         <div className="flex gap-2 border-b px-4">
-          <button className={`px-3 py-2 text-sm ${tab==='collections'?'border-b-2 border-black':''}`} onClick={()=>setTab('collections')}>Koleksiyonlar</button>
-          <button className={`px-3 py-2 text-sm ${tab==='search'?'border-b-2 border-black':''}`} onClick={()=>setTab('search')}>Arama</button>
-          <button className={`px-3 py-2 text-sm ${tab==='insert'?'border-b-2 border-black':''}`} onClick={()=>setTab('insert')}>Vektör Yükle</button>
-          <button className={`px-3 py-2 text-sm ${tab==='snapshots'?'border-b-2 border-black':''}`} onClick={()=>setTab('snapshots')}>Snapshots</button>
-          <button className={`px-3 py-2 text-sm ${tab==='security'?'border-b-2 border-black':''}`} onClick={()=>setTab('security')}>Güvenlik</button>
+          <Link
+            to="/collections"
+            className={`px-3 py-2 text-sm ${isActive('/collections')?'border-b-2 border-black font-medium':''}`}
+          >
+            Koleksiyonlar
+          </Link>
+          <Link
+            to="/search"
+            className={`px-3 py-2 text-sm ${isActive('/search')?'border-b-2 border-black font-medium':''}`}
+          >
+            Arama
+          </Link>
+          <Link
+            to="/insert"
+            className={`px-3 py-2 text-sm ${isActive('/insert')?'border-b-2 border-black font-medium':''}`}
+          >
+            Vektör Yükle
+          </Link>
+          <Link
+            to="/snapshots"
+            className={`px-3 py-2 text-sm ${isActive('/snapshots')?'border-b-2 border-black font-medium':''}`}
+          >
+            Snapshots
+          </Link>
+          <Link
+            to="/security"
+            className={`px-3 py-2 text-sm ${isActive('/security')?'border-b-2 border-black font-medium':''}`}
+          >
+            Güvenlik
+          </Link>
         </div>
-        {tab==='collections' && <Collections />}
-        {tab==='search' && <Search />}
-        {tab==='insert' && <InsertVectors />}
-        {tab==='snapshots' && <Snapshots />}
-        {tab==='security' && <Security />}
+        {children}
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/collections" replace />} />
+        <Route path="/collections" element={<ProtectedLayout><Collections /></ProtectedLayout>} />
+        <Route path="/search" element={<ProtectedLayout><Search /></ProtectedLayout>} />
+        <Route path="/insert" element={<ProtectedLayout><InsertVectors /></ProtectedLayout>} />
+        <Route path="/snapshots" element={<ProtectedLayout><Snapshots /></ProtectedLayout>} />
+        <Route path="/security" element={<ProtectedLayout><Security /></ProtectedLayout>} />
+      </Routes>
+    </BrowserRouter>
   )
 }

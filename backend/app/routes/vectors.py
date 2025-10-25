@@ -1,57 +1,55 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
-from qdrant_client import models as qm
 
 from ..qdrant.client import get_qdrant_client
 from ..schemas.vectors import DeleteRequest, InsertVectorsRequest, SearchRequest
+from ..services.vector_service import VectorService
 from .deps import require_auth
 
 router = APIRouter(prefix="/vectors", tags=["Vectors"])
 
 
+async def get_vector_service(_: str = Depends(require_auth)) -> VectorService:
+    """Dependency injection for VectorService"""
+    client = await get_qdrant_client()
+    return VectorService(client)
+
+
 @router.post("/insert")
-def insert_vectors(body: InsertVectorsRequest, _: str = Depends(require_auth)) -> dict:
-    c = get_qdrant_client()
-    points = [
-        qm.PointStruct(id=p.id, vector=p.vector, payload=p.payload or {}) for p in body.points
-    ]
+async def insert_vectors(
+    body: InsertVectorsRequest,
+    service: VectorService = Depends(get_vector_service)
+) -> dict[str, int]:
+    """Insert or update vectors in a collection"""
     try:
-        c.upsert(collection_name=body.collection, points=points, wait=True)
-        return {"inserted": len(points)}
+        return await service.insert_vectors(body)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to insert vectors: {str(e)}")
 
 
 @router.post("/search")
-def search(body: SearchRequest, _: str = Depends(require_auth)) -> dict:
-    c = get_qdrant_client()
+async def search(
+    body: SearchRequest,
+    service: VectorService = Depends(get_vector_service)
+) -> dict[str, list[dict[str, Any]]]:
+    """Search for similar vectors"""
     try:
-        res = c.search(
-            collection_name=body.collection,
-            query_vector=body.vector,
-            limit=body.limit,
-            with_payload=body.with_payload,
-        )
-        out = [
-            {
-                "id": str(r.id),
-                "score": float(r.score),
-                "payload": r.payload,
-            }
-            for r in res
-        ]
-        return {"results": out}
+        return await service.search_vectors(body)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Search failed: {str(e)}")
 
 
 @router.post("/delete")
-def delete_points(body: DeleteRequest, _: str = Depends(require_auth)) -> dict:
-    c = get_qdrant_client()
+async def delete_points(
+    body: DeleteRequest,
+    service: VectorService = Depends(get_vector_service)
+) -> dict[str, int]:
+    """Delete vectors from collection"""
     try:
-        c.delete(collection_name=body.collection, points_selector=qm.PointIdsList(points=body.ids))
-        return {"deleted": len(body.ids)}
+        return await service.delete_vectors(body)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to delete vectors: {str(e)}")
 
